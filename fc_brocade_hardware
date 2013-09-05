@@ -1,0 +1,57 @@
+#!/usr/bin/env python
+
+""" FC Brocade Sensor infos
+By Mathias Decker
+contact: mathias.decker@mdc-berlin.de
+         github@mathiasdecker.de
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+# author: mathias.decker@mdc-berlin.de
+
+
+def inventory_fc_brocade_hardware(checkname, info):
+   inventory = []
+   lineIndex = 0
+   
+   for sensor_info, sensor_value, sensor_status in info:
+      inventory.append( (sensor_info, None) )
+   return inventory
+
+def check_fc_brocade_hardware(item, params, info):
+   pd = ""
+
+   for sensor_info, sensor_value, sensor_status in info:
+      if sensor_info == item:
+         
+         if item[:12] != "Power Supply":
+            pd = [ (sensor_info,sensor_value,None,None) ]
+            
+         if sensor_status == "1":
+            return (3, "UNKNOWN - " + item + " is unknown" ,pd)
+         if sensor_status == "2":
+            return (2, "CRITICAL - " + item + " is faulty" ,pd)
+         if sensor_status == "3":
+            return (1, "WARNING - " + item + " is below minimal" ,pd)
+         if sensor_status == "4":
+            return (0, "OK - " + item + " is normal" ,pd)
+         if sensor_status == "5":
+            return (2, "CITICAL - " + item + " is above maximum" ,pd)
+         if sensor_status == "6":
+            return (1, "WARNING - " + item + " is absent or missing" ,pd)
+         
+         return (3, "UNKNOWN - not yet implemented")
+
+check_info["fc_brocade_hardware"] = (check_fc_brocade_hardware, "%s", 1, inventory_fc_brocade_hardware)
+snmp_info["fc_brocade_hardware"] = ( ".1.3.6.1.4.1.1588.2.1.1.1.1.22.1", [ "5", "4", "3" ] )

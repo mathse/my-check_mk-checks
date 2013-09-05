@@ -1,0 +1,91 @@
+#!/usr/bin/env python
+
+""" HP Carepack availability
+uses https://github.com/ocdnix/hpisee/blob/master/hpisee.py
+put it under ~/var/check_mk/web/libexec/hpisee.py
+
+By Mathias Decker
+contact: mathias.decker@mdc-berlin.de
+         github@mathiasdecker.de
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
+hp_carepack_ignore_validity = False
+
+def inventory_hp_carepack_server(checkname, info):
+   inventory = []
+   for serial in info:
+      inventory.append( ("HW Carepack Server", hp_carepack_ignore_validity) )
+   return inventory
+
+def check_hp_carepack_validity(soap_answer):
+   from bs4 import BeautifulSoup
+   import datetime
+   soup = BeautifulSoup(soap_answer)
+   msg = ""
+
+   for contract in soup.findAll("offer"):
+      if not contract.appliesto:
+         continue
+
+      description = contract.offerdescription.string
+      code = contract.offercode.string
+      start = contract.appliesto.startdate.string
+      end = contract.appliesto.enddate.string
+      if datetime.date(int(end.split("-")[0]),int(end.split("-")[1]),int(end.split("-")[2])) - datetime.date.today() >= datetime.timedelta(days = 0):
+         msg += "".join((code," ",description," is <b>active until ",end,"</b><br>"))
+      else:
+         msg += "".join((code," ",description," is <b>expired since ",end,"</b><br>"))
+
+   return(msg)
+
+
+def check_hp_carepack_soap_request(serial,model):
+   import random
+   from os.path import expanduser
+
+   # Cache the result for 1 day and a random portion of 1 day
+   cache_seconds = (60 * 60 *24) + (60 * 60 * (24 * random.random()))
+
+   # The cache file to use
+   cache_file = expanduser("~")+"/tmp/check_mk/cache/carepack.cache."+serial+"."+model
+   import sys, datetime, time, os
+
+   # use the cache?
+   if os.path.exists(cache_file) and os.stat(cache_file).st_mtime > (time.time() - cache_seconds) and len(file(cache_file).read()) != 0:
+      soap_answer = file(cache_file).read()
+   else:
+      os.chdir(expanduser("~")+"/var/check_mk/web/libexec")
+      soap_answer = os.popen(expanduser("~")+"/var/check_mk/web/libexec/hpisee.py "+serial+","+model+", -a /tmp/hp-auth."+serial+'.'+str(random.random())).read()
+      file(cache_file, 'w').write(soap_answer)
+
+   validity = check_hp_carepack_validity(soap_answer)
+   return (validity)
+
+
+def check_hp_carepack_server(item, params, info):
+   serial = info[0][0]
+   model = info[0][1]
+   carepack = check_hp_carepack_soap_request(serial,model)
+
+   if params == True:
+      carepack += "(!!) check manually set to be always OK"
+   if carepack.find("active") != -1 or params == True:
+      return (0, carepack)
+   else:
+      return (2, carepack)
+         
+check_info["hp_carepack_server"] = (check_hp_carepack_server, "%s", 1, inventory_hp_carepack_server)
+snmp_info["hp_carepack_server"] = ( ".1.3.6.1.4.1.232.2.2.2", [ "1.0","6.0" ] )

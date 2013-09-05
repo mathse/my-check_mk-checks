@@ -1,0 +1,62 @@
+#!/usr/bin/env python
+
+""" queries livestatus for its mac address on switch ports -> getting the parrent-switch of a server
+By Mathias Decker
+contact: mathias.decker@mdc-berlin.de
+         github@mathiasdecker.de
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
+def inventory_interface_switch_location(checkname, info):
+   inventory = []
+   lineIndex = 0
+   for interface, type, mac, state, name, opstatus in info:
+      if type == "6" and state == "1" and mac.encode('hex') != "" and opstatus == "1":
+         if name.find("Miniport") == -1:
+            inventory.append( ("HW Switch-Port " + mac.encode('hex'), None) )
+   return inventory
+
+def check_interface_switch_location(item, params, info):
+   msg = ""
+   for interface, type, mac, state, name, opstatus in info:
+      if "HW Switch-Port " + mac.encode('hex') == item:
+         # this needs to be adjusted
+         socket_path = "/omd/sites/prod/tmp/run/live"
+         import socket
+         # firewall exception
+         if (lookup_ipaddress(g_hostname)[:10] == "141.80.181") or (lookup_ipaddress(g_hostname)[:10] == "141.80.183"):
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.connect(("nagios.mdc-berlin.net",6557))
+         else:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            s.connect(socket_path)
+         s.send("GET services\nColumns: host_name host_alias description\nFilter: plugin_output ~~ " + mac.encode('hex') + "\n")
+         s.shutdown(socket.SHUT_WR)
+         answer = s.recv(100000000)
+         if answer == "":
+            msg = "location unknown"
+         else:
+            msg = answer.replace(";"," -> ")
+            try:
+               parents = host_extra_conf(g_hostname,extra_host_conf.get("parents", []))
+         
+               if len(parents) == 0:
+                  msg += "(!)parent not set"
+            except:
+               pass
+         return (0, msg.replace("\n"," "))
+     
+check_info["interface_switch_location"] = (check_interface_switch_location, "%s", 1, inventory_interface_switch_location)
+snmp_info["interface_switch_location"] = ( ".1.3.6.1.2.1.2.2.1", [ "1","3","6","7","2","8" ] )

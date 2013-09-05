@@ -1,0 +1,199 @@
+#!/usr/bin/env python
+
+""" cisco accesspoint checks
+create a cluster of all cisco controller to prevent accesspoint from
+hopping between controllers
+
+By Mathias Decker
+contact: mathias.decker@mdc-berlin.de
+         github@mathiasdecker.de
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+# author: mathias.decker@mdc-berlin.de
+
+olditem = 0
+
+def inventory_cisco_wcs_aps(checkname, info):
+   # Debug: lets see how the data we get looks like
+   #import pprint
+   inventory = []
+   radio = 1
+   for line in info:
+      if line[0] != "":
+         name = line[0]
+         apname = name
+      else:
+         if radio == 1:
+            apname = name + " - Radio 11b/g"
+            radio = 2
+         else:
+            apname = name + " - Radio 11a"
+            radio = 1
+      inventory.append( (apname, None) )
+   return inventory
+
+def check_cisco_wcs_aps(item, params, info):
+   import os
+   type = None
+   for index in range(len(info)):
+#      print "line: " + line
+
+      if item == info[index][0]:
+         line = info[index]
+         type = "ap"
+         break
+
+      if item.replace(" - Radio 11b/g","") == info[index][0]:
+         line = info[index+1]
+         type = "radio"
+         break
+
+      if item.replace(" - Radio 11a","") == info[index][0]:
+         line = info[index+2]
+         type = "radio"
+         break
+
+   # defining some vars for output
+   crit = 0
+   critMsg = ""
+   warn = 0
+   warnMsg = ""
+
+#   if type == None:
+#      print "item:" + item
+   
+   if type == "ap":
+      name = line[0]
+      astatus = line[1]
+      ostatus = line[2]
+      ip = line[3]
+
+      if astatus != "1" or ostatus != "1":
+         warn = warn + 1
+         warnMsg += "AdminStatus or OperatingStatus is not OK; "
+
+      run = "/usr/local/nagios/libexec/check_icmp -n 1 -H "
+      run += ip
+      ping = os.popen(run).read()
+      
+      if ip != "0.0.0.0":
+         if ping.split(" - ")[0] != "OK":
+            crit = crit + 1
+            critMsg += ping.split(" - ")[1]
+            critMsg += "; "
+      else:
+         crit = crit + 1
+         critMsg += "IP: 0.0.0.0 - AP seems to have a problem"
+      
+      if crit > 0:
+         return (2, "".join(("CRITICAL - ",critMsg,warnMsg)))
+      if warn > 0:
+         return (1, "".join(("WARNING - ",warnMsg)))
+      return (0, ping)      
+
+   if type == "radio":
+      channel = line[4]
+      tx = line[5]
+      rx = line[6]
+      channelutil = line[7]
+      numofclients = line[8]
+      load = line[9]
+      interf = line[10]
+      noise = line[11]
+      coverage = line[12]
+
+      pd = "|tx="
+      pd += tx
+      pd += ";80;90;; "
+      pd += "rx="
+      pd += rx
+      pd += ";80;90;; "
+      pd += "channelutil="
+      pd += channelutil
+      pd += ";80;90;; "
+      pd += "interference="
+      pd += interf
+      pd += ";50;60;; "
+      pd += "noise="
+      pd += noise
+      pd += ";50;60;; "
+      pd += "NumOfClients="
+      pd += numofclients
+      pd += ";15;30;; "
+
+      
+      if int(tx) > 80:
+         warn = warn + 1
+         warnMsg += "TX > 80; "
+      if int(rx) > 80:
+         warn = warn + 1
+         warnMsg += "RX > 80; "      
+      if int(channelutil) > 80:
+         warn = warn + 1
+         warnMsg += "ChannelUsage > 80; "
+      if int(interf) > 50:
+         warn = warn + 1
+         warnMsg += "Interference > 50; "
+      if int(noise) > 50:
+         warn = warn + 1
+         warnMsg += "Noise > 50; "
+      if int(numofclients) > 15:
+         warn = warn + 1
+         warnMsg += "Number of Clients > 15; "
+
+      if int(tx) > 90:
+         crit = crit + 1
+         critMsg += "TX > 90; "
+      if int(rx) > 90:
+         crit = crit + 1
+         critMsg += "RX > 90; "
+      if int(channelutil) > 90:
+         crit = crit + 1
+         critMsg += "ChannelUsage > 90; "
+      if int(interf) > 60:
+         crit = crit + 1
+         critMsg += "Interference > 60; "
+      if int(noise) > 60:
+         crit = crit + 1
+         critMsg += "Noise > 60; "
+      if int(numofclients) > 30:
+         crit = crit + 1
+         critMsg += "Number of Clients > 30; "
+
+      if crit > 0:
+         return (2, "".join(("CRITICAL - ",critMsg,warnMsg,pd)))
+      if warn > 0:
+         return (1, "".join(("WARNING - ",warnMsg,pd)))
+      return (0, "".join(("OK - ",numofclients," Clients connected to this Radio (using channel:",channel,")",pd)))
+
+   return (3, "UNKNOWN - run cmk -II on the ap-controller again")
+
+check_info["cisco_wcs_aps"] = \
+      (check_cisco_wcs_aps, "%s", 1, inventory_cisco_wcs_aps)
+
+snmp_info["cisco_wcs_aps"] = ( ".1.3.6.1.4.1.14179.2.2", ["1.1.3", # AP-Name
+							"1.1.37", # AdminStatus
+							"1.1.6", # OperStatus
+							"1.1.19", # IP-Adresse
+							"2.1.4", # UsedChanel
+							"13.1.1", # TX_Utilisation
+							"13.1.2", # RX_Utilisation
+							"13.1.3", # ChannelUtilization
+							"13.1.4", # NumOfClients
+							"16.1.1", # Load
+							"16.1.2", # Interference
+							"16.1.3", # Noise
+							"16.1.24" # Coverage
+							] )

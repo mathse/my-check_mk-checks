@@ -1,0 +1,94 @@
+#!/usr/bin/env python
+
+""" PDU status checks
+By Mathias Decker
+contact: mathias.decker@mdc-berlin.de
+         github@mathiasdecker.de
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+# author: mathias.decker@mdc-berlin.de
+
+def inventory_gudeads_pdu(checkname, info):
+   # Debug: lets see how the data we get looks like
+   import pprint; #pprint.pprint(info)
+   inventory = []
+   lineIndex = 0
+   for ChanStatus, EnergyActive, PowerActive, Current, Voltage, Frequency, PowerFactor, Pangle, PowerApparent, PowerReactive, EnergyReactive, EnergyActive, EnergyReactive, ResetTime in info:
+      line = "Powerline" + str(lineIndex) 
+      inventory.append( (line, None) )
+      lineIndex = lineIndex + 1
+   return inventory
+
+def check_gudeads_pdu(item, params, info):
+   critMsg = ""
+   warnMsg = ""
+   crit = 0
+   warn = 0
+   CurrentMax = 15000
+   CurrentWarn = 12000
+   PowerActiveMax = 3000
+   PowerActiveWarn = 2500
+   pd = ""
+
+   if item == "Powerline0":
+      line = info[0]
+   if item == "Powerline1":
+      line = info[1]
+   if item == "Powerline2":
+      line = info[2]
+
+   ChanStatus = line[0]
+   Current = line[3]
+   Frequency = line[5]
+   PowerActive = line[2]
+  
+   # check if channel data is available
+   if ChanStatus == "0":
+      crit = crit + 1
+      critMsg = "ChanStatus: no data available"
+
+   # check current on channel - max @ 16A per channel
+   if int(Current) > CurrentMax:
+      crit = crit + 1
+      critMsg = "- Current: "+str(Current)+"mA ("+str(CurrentMax)+"mA)"
+   elif int(Current) > CurrentWarn:
+      warn = warn + 1
+      warnMsg = "- Current: "+str(Current)+"mA ("+str(CurrentMax)+"mA)"
+
+   # check power usage on channel - max @ 3200W per channel
+   if int(PowerActive) > PowerActiveMax:
+      crit = crit + 1
+      critMsg = "- PowerActive: "+str(PowerActive)+"W ("+str(PowerActiveMax)+"W)"
+   elif int(PowerActive) > PowerActiveWarn:
+      warn = warn + 1
+      warnMsg = "- PowerActive: "+str(PowerActive)+"W ("+str(PowerActiveMax)+"W)"
+
+
+   if (float(Frequency) < 4800) or (float(Frequency) > 5200):
+      crit = crit + 1
+      critMsg = "- Frequency: "+str(float(Frequency)/100)+"Hz but should be 50Hz"
+
+   pd = [ ("current",Current,CurrentWarn,CurrentMax),("power",PowerActive,PowerActiveWarn,PowerActiveMax),("frequency",float(Frequency)/100,None,None) ]
+
+   if crit > 0:
+      return (2, "".join(("CRIT ",critMsg,warnMsg)),pd)
+   if warn > 0:
+      return (1, "".join(("WARN ",warnMsg)),pd)
+   return (0, "OK - everything is fine",pd)
+         
+   #return (3, "UNKNOWN - not yet implemented")
+
+check_info["gudeads_pdu"] = (check_gudeads_pdu, "%s", 1, inventory_gudeads_pdu)
+snmp_info["gudeads_pdu"] = ( ".1.3.6.1.4.1.28507.26.1.5.1.2.1", [ "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15" ] )

@@ -1,0 +1,44 @@
+#!/usr/bin/env python
+
+""" lists all configured shares of a sun open storage box
+By Mathias Decker
+contact: mathias.decker@mdc-berlin.de
+         github@mathiasdecker.de
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
+check_includes['sunstorage_shares'] = [ "df.include" ]
+
+def inventory_sunstorage_shares(info):
+   inventory = []
+   lineIndex = 0
+
+   for sharename, size, used, subproject in info:
+      inventory.append( ("Share " + sharename, None) )
+   return inventory
+
+def check_sunstorage_shares(item, params, info):
+   pd = ""
+   for sharename, size, used, subproject in info:
+      if "Share " + sharename == item:
+         pd = [ ('used',used,(float(size)*0.8),(float(size)*0.9),0,size) ]
+         return (0, "OK - [" + subproject + "] " + sharename + " is at " + str(round((float(used)/float(size))*100,1)) + "% (" + used + "GB of " + size + "GB in use)",pd)
+
+check_info["sunstorage_shares"] = (check_sunstorage_shares, "%s", 1, inventory_sunstorage_shares)
+
+snmp_info["sunstorage_shares"] = ( ".1.3.6.1.4.1.42.2.225.1.6.1", ["5","7","8","4"] )
+
+snmp_scan_functions["sunstorage_shares"] = lambda oid: oid(".1.3.6.1.4.1.42.2.225.1.4.2.0") == "Sun ZFS Storage 7320" or oid(".1.3.6.1.4.1.42.2.225.1.4.2.0") == "Sun Storage 7110"
+

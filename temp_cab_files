@@ -1,0 +1,35 @@
+#!/usr/bin/env python
+
+""" scans for cab files in windows/temp (caused by broken/old windows_updates.vbs)
+By Mathias Decker
+contact: mathias.decker@mdc-berlin.de
+         github@mathiasdecker.de
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+# author: mathias.decker@mdc-berlin.de
+
+def inventory_temp_cab_files(info):
+   inventory = []
+   inventory.append(("Cab files",None,None))
+   return inventory
+
+def check_temp_cab_files(item, params, info):
+   for line in info:
+      if line[0] > 0:
+         return (2, "CRITICAL - " + line[0] + " Cab files found - looks like the cbs log is corrupted - this could fill up your system disk - refere to <a href='https://itsupport.mdc-berlin.net:4435/helpdesk/WebObjects/Helpdesk.woa/wa/FaqActions/view?faqId=21' target='_blank'><u>this</u></a> faq to fix this")
+      
+   return (0, "OK - no cab files found")
+
+check_info['temp_cab_files'] = (check_temp_cab_files, "", 0, inventory_temp_cab_files)

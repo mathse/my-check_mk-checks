@@ -1,0 +1,71 @@
+#!/usr/bin/env python
+
+""" lists windows printers, there location, driver, shared- and publishing status
+By Mathias Decker
+contact: mathias.decker@mdc-berlin.de
+         github@mathiasdecker.de
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
+def inventory_windows_printer(info):
+   inventory = []
+   for line in info:
+      inventory.append( (line[0].replace("%20"," "),"",None) )
+   return inventory 
+
+# the check function (dummy)
+def check_windows_printer(item, params, info):
+   for line in info:
+      if line[0].replace("%20"," ") == item:
+         ip = line[1]
+         location = line[2].replace("%20"," ")
+         published = line[3]
+         shared = line[4]
+         x86 = line[5]
+         x64 = line[6]
+         driver = line[7]
+         critC = 0
+         critM = ""
+         warnC = 0
+         warnM = ""
+
+         if x86 == "0":
+            critC = critC + 1
+            critM = critM + " (!!) x86 driver missing "
+         if x64 == "0":
+            critC = critC + 1
+            critM = critM + " (!!) x64 driver missing "
+         if location == "None":
+            warnC = warnC + 1
+            warnM = warnM + " (!) location is missing "
+         if published == "0":
+            warnC = warnC + 1
+            warnM = warnM + " (!) printer is not published in the directory "
+         if shared == "0":
+            warnC = warnC + 1
+            warnM = warnM + " (!) <b>printer is not shared</b>, is it still needed? "
+         if driver.lower().find("universal") != -1 and ip.find("141.80.105") == -1:
+            warnC = warnC + 1
+            warnM = warnM + " (!) printer uses universal printing driver "
+
+         if critC > 0:
+            return (2, "".join(("CRIT - IP: ",ip,critM,warnM)))
+         if warnC > 0:
+            return (1, "".join(("WARN - IP: ",ip,warnM)))
+         return(0,"".join(("OK - ","IP: ",ip," location: ",location)))
+   return (3, "Sorry - not implemented")
+
+# declare the check to Check_MK
+check_info['windows_printer'] = (check_windows_printer, "Printer %s", 0, inventory_windows_printer)

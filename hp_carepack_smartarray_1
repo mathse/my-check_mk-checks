@@ -1,0 +1,41 @@
+#!/usr/bin/env python
+
+""" 
+By Mathias Decker
+contact: mathias.decker@mdc-berlin.de
+         github@mathiasdecker.de
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+# author: mathias.decker@mdc-berlin.de
+
+def inventory_hp_carepack_smartarray_1(checkname, info):
+   # Debug: lets see how the data we get looks like
+   import pprint; #pprint.pprint(info)
+   inventory = []
+
+   for serial, model, port in info:
+      if serial != "":
+         inventory.append( ("HW Carepack MSA @Port " + port, None) )
+   return inventory
+
+def check_hp_carepack_smartarray_1(item, params, info):
+   for serial, model, port in info:
+      if item == "HW Carepack MSA @Port " + port:
+	 rtn = "serial: " + serial + " - model: " + model + " - port: " + port
+         return (0, rtn)
+         
+check_info["hp_carepack_smartarray_1"] = (check_hp_carepack_smartarray_1, "%s", 1, inventory_hp_carepack_smartarray_1)
+snmp_info["hp_carepack_smartarray_1"] = ( ".1.3.6.1.4.1.232.8.2.1.1", [ "17.2","4.2","21.2" ] )
+				    #.1.3.6.1.4.1.232.2.2.2.6.0

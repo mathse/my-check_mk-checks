@@ -1,0 +1,65 @@
+#!/usr/bin/env python
+
+""" Shows HP ILO and checks if its pingable and http interface is up
+By Mathias Decker
+contact: mathias.decker@mdc-berlin.de
+         github@mathiasdecker.de
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
+def inventory_hp_ilo(checkname, info):
+   inventory = []
+   lineIndex = 0
+   for ilo in info:
+      line = str(lineIndex) 
+      inventory.append( ("HW ILO Address", None) )
+      lineIndex = lineIndex + 1
+   return inventory
+
+def check_hp_ilo(item, params, info):
+   import os
+   ip = info[0][0]
+   run = "/usr/local/nagios/libexec/check_icmp -n 1 -H " + ip
+   ping = os.popen(run).read()
+   crit = 0
+   dmz = False
+   msg = ""
+
+   if ping.split(" - ")[0] != "OK":
+      crit = crit + 1
+      msg = msg + "(!!) ilo ip is not pingable"
+  
+   if ip == "0.0.0.0":
+      crit = 0
+      msg = msg + " ignored - ilo not configured"
+
+   # exception for firewalled subnets
+   if (crit > 0) and ((lookup_ipaddress(g_hostname)[:10] == "141.80.181") or (lookup_ipaddress(g_hostname)[:10] == "141.80.183")):
+      crit = 0
+      dmz = True
+      msg = msg + " ignored - firewall blocks detailed checking"
+
+   if (crit == 0):
+      if(os.popen("/usr/local/nagios/libexec/check_tcp -H " + ip + " -p 80 -t 2").read().split(" - ")[0]=="CRITICAL") and dmz == False:
+         crit = crit + 1
+         msg = msg + "(!!) website cannot be opened"
+   
+   if crit > 0:
+      return (2, ip + msg)
+   else:
+      return (0, ip + msg)
+        
+check_info["hp_ilo"] = (check_hp_ilo, "%s", 1, inventory_hp_ilo)
+snmp_info["hp_ilo"] = ( ".1.3.6.1.4.1.232.9.2.5.1.1.5", [ "2" ] )

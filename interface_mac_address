@@ -1,0 +1,75 @@
+#!/usr/bin/env python
+
+""" lists the mac address of all interfaces/ports of a switch
+By Mathias Decker
+contact: mathias.decker@mdc-berlin.de
+         github@mathiasdecker.de
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
+def inventory_interface_mac_address(checkname, info):
+   inventory = []
+   switchDescription = snmpwalk_on_suboid(g_hostname,lookup_ipaddress(g_hostname),"1.3.6.1.2.1.1.1.0")
+   lineIndex = 0
+   for mac, port, state in info:
+      portName = ""
+      if port == "":
+         continue
+      if mac.encode('hex') == "":
+         continue
+
+      if switchDescription[0][1].find("Chassis") > 0:
+         portIndex = (snmpwalk_on_suboid(g_hostname,lookup_ipaddress(g_hostname),"1.3.6.1.2.1.17.1.4.1.2." + port))
+
+         # default interface port
+         if len(portIndex[0][1]) == 5:
+            type= ""
+            portType = portIndex[0][1][1]
+            if portType == "1":
+               type = "fe"
+            if portType == "2":
+               type = "ge"
+            portName = type + "." + portIndex[0][1][0] + "." + portIndex[0][1][3] + portIndex[0][1][4]
+         else:
+            continue
+
+      else:
+         if int(port) > 47:
+            continue
+         portName = "ge.1." + port
+
+      inventory.append( ("Port " + portName + " [" + port + "]", None) )
+      lineIndex = lineIndex + 1
+   return inventory
+
+def check_interface_mac_address(item, params, info):
+   portsIndex = []
+   msg = ""
+   lineIndex = 0
+   
+   for mac, port, state in info:
+      if item.find("["+port+"]") > 0:
+         
+         try:
+            msg = portsIndex[int(port)]
+         except:
+            pass
+         msg += " "
+         msg += mac.encode('hex')
+         portsIndex.insert(int(port),msg)
+   return (0, msg)
+     
+check_info["interface_mac_address"] = (check_interface_mac_address, "%s", 1, inventory_interface_mac_address)
+snmp_info["interface_mac_address"] = ( ".1.3.6.1.2.1.17.4.3.1", [ "1","2","3" ] )
