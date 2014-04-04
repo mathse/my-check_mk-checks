@@ -1,0 +1,64 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+""" temperatures in a DDN Storage
+By Mathias Decker
+contact: mathias.decker@mdc-berlin.de
+         github@mathiasdecker.de
+         
+         This program is free software: you can redistribute it and/or modify
+         it under the terms of the GNU General Public License as published by
+         the Free Software Foundation, either version 3 of the License, or
+         (at your option) any later version.
+         
+         This program is distributed in the hope that it will be useful,
+         but WITHOUT ANY WARRANTY; without even the implied warranty of
+         MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+         GNU General Public License for more details.
+         
+         You should have received a copy of the GNU General Public License
+         along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         """
+         
+def inventory_ddn_temp(info):
+    return [ ("%s:%s" % (x[1], x[2]) , None) for x in info ]
+
+def check_ddn_temp(item, _no_params, info):
+
+    pdisk_state = {
+         1  : 'Normal',
+         2  : 'Warning',
+         2  : 'Critical',
+    }
+
+    for index, encid, encpos, status  in info:
+        ditem = "%s:%s" % ( encid, encpos )
+        if ditem == item:
+            state = 0
+            status = saveint(status)
+            msg = ["Temp: %s (Enclosure: %s, Position: %s)" % ( index, encid, encpos ) ]
+            label = ""
+            if status in [ 3 ]:
+                state = 1
+                label = "(!)"
+            elif status in [ 2 ]:
+                state = 2
+                label = "(!!)"
+            msg.append("state %s%s" % ( pdisk_state.get(status, 'ukn (%s)' % status ), label ))
+
+            return state, ", ".join(msg)
+    return 3, "Device not found in SNMP tree"
+
+check_info["ddn_temp"] = {
+    "check_function"        : check_ddn_temp,
+    "inventory_function"    : inventory_ddn_temp,
+    "service_description"   : "Temp %s",
+    "has_perfdata"          : False,
+    "snmp_scan_function"    : lambda oid: oid('.1.3.6.1.2.1.1.2.0').startswith('.1.3.6.1.4.1.8072'),
+    "snmp_info"             : ( ".1.3.6.1.4.1.6894.2.6.1", [
+                                            1, # tempIndex
+                                            2, # tempEncId
+                                            3, # tempEncPos
+                                            4, # tempStatus
+                              ]),
+}
+
