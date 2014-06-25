@@ -1,0 +1,86 @@
+#!/bin/bash
+# This CheckMK Plugin covers Linux Updates and integrates itself into <<<windows_updates>>>
+# currently supported: Ubuntu, Sles, CentOS
+# requirements: facter
+# By Mathias Decker
+# contact: mathias.decker@mdc-berlin.de
+# github@mathiasdecker.de
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+#
+# !!! currently you need to have facter installed !!!
+#
+
+reboot_required=0
+num_important_updates=0
+num_optional_updates=0
+
+cache_file="/tmp/check_mk_linux_updates.cache"
+cache_seconds=7200
+cache_age=0
+
+if test -f $cache_file
+then
+    cache_age=$(expr `date +%s` - `stat -c %Y $cache_file`)
+else
+    cache_age=$cache_seconds
+fi
+
+echo "<<<windows_updates>>>"
+
+if [ "$cache_age" -ge "$cache_seconds" ]
+then
+    if [ "$(facter operatingsystem)" == "Ubuntu" ]
+    then
+        if test -f /var/run/reboot-required
+        then
+                reboot_required=1
+        fi
+        important_updates=$(apt-get -s upgrade | grep Conf | awk '{print $2}' | sort | sed ':a;N;$!ba;s/\n/ /g' | sort)
+        optional_updates=$(apt-get -s dist-upgrade | grep Conf | awk '{print $2}' | sort | sed ':a;N;$!ba;s/\n/ /g' | sort)
+    fi
+
+    if [ "$(facter operatingsystem)" == "CentOS" ]
+    then
+        LAST_KERNEL=$(rpm -q --last kernel | perl -pe 's/^kernel-(\S+).*/$1/' | head -1)
+        CURRENT_KERNEL=$(uname -r)
+        if test $LAST_KERNEL != $CURRENT_KERNEL; then
+                reboot_required=1
+        fi
+        important_updates=$(yum list-security -q | awk '{print $3}' | sed ':a;N;$!ba;s/\n/ /g' | sort)
+        optional_updates=$(yum list updates -q | grep -v "^Updated Packages$" | awk '{print $1}' | sed ':a;N;$!ba;s/\n/ /g' | sort)
+    fi
+
+    if [ "$(facter operatingsystem)" == "SLES" ]
+    then
+        LAST_KERNEL=$(rpm -q --last kernel-default | perl -pe 's/^kernel-default-(\S+).*/$1/' | head -1)
+        CURRENT_KERNEL=$(uname -r | sed 's/-default$//g')
+        if [[ $LAST_KERNEL != $CURRENT_KERNEL* ]]; then
+                reboot_required=1
+        fi
+        important_updates=$(zypper -q lp --issue=security | tail -n+4 | awk '{print $1}' | sed ':a;N;$!ba;s/\n/ /g' | sort)
+        optional_updates=$(zypper -q lp | tail -n+4 | awk '{print $3}' | sed ':a;N;$!ba;s/\n/ /g' | sort)
+    fi
+
+    num_important_updates=$(echo $important_updates | wc -w)
+    num_optional_updates=$(echo $optional_updates | wc -w)
+
+    echo "$reboot_required $num_important_updates $num_optional_updates" > $cache_file
+    echo "$important_updates" >> $cache_file
+    echo "$optional_updates" >> $cache_file
+
+fi
+
+cat $cache_file
