@@ -9,3 +9,9 @@ the need to be copied to <site>/local/share/check_mk/checks/
 copy those to /usr/lib/check_mk_agent/local
 
 important: some of those checks need facter to work
+
+# plugin_checks
+
+copy those to /usr/lib/check_mk_agent/plugins
+
+important: some of those checks need facter to work
