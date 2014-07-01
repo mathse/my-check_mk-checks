@@ -48,12 +48,22 @@ dell_powerconnect_10g_temp_sensor_state_performance_map = { '1': 1, '2': 0, '3':
 # set default value of variable (user can override in main.mk)
 dell_powerconnect_10g_temp_default_values = (35, 40)
 
+def inventory_dell_powerconnect_10g_temp_convert(name):
+    vars = [
+            "MAC",
+            "CPU",
+            "PHY left side",
+            "PHY right side",
+            ]
+    return vars[name]
+
 # Inventory all of the temperature sensors
 def inventory_dell_powerconnect_10g_temp(checkname, info):
     inventory = []
-    for temp, state, index in info:
+    for temp, state, stack, index in info:
         # use default variable as parameter. Note the quotes!
-        inventory.append((index, "dell_powerconnect_10g_temp_default_values"))
+        inventory.append(("Stack " + str(stack) + " " + inventory_dell_powerconnect_10g_temp_convert(int(index)), "dell_powerconnect_10g_temp_default_values"))
+        #index = index + 1
     return inventory
 
 # Execute a check against each sensor.
@@ -62,27 +72,30 @@ def check_dell_powerconnect_10g_temp(item, params, info):
     sensor_info = ""
     temp_info = ""
 
-    for temp, state, index in info:
-        status = 0
-        dell_powerconnect_status = dell_powerconnect_10g_temp_status_map[state]
+    for temp, state, stack, index in info:
+#        print "Temperature Stack " + str(stack) + " " + inventory_dell_powerconnect_10g_temp_convert(int(index))
+#        print item
+        if item == "Stack " + str(stack) + " " + inventory_dell_powerconnect_10g_temp_convert(int(index)):
+            status = 0
+            dell_powerconnect_status = dell_powerconnect_10g_temp_status_map[state]
 
-	if state == 3:
-	   sensor_info = "(!!)"
+    	    if state == 3:
+	        sensor_info = "(!!)"
 
-        if int(temp) >= crit:
-            status = 2
-	    temp_info = "(!!)"
+            if int(temp) >= crit:
+                status = 2
+	        temp_info = "(!!)"
 
-        elif int(temp) >= warn:
-            status = 1
-	    temp_info = "(!)"
-        else:
-            status = dell_powerconnect_10g_temp_status2nagios_map[dell_powerconnect_status]
+            elif int(temp) >= warn:
+                status = 1
+	        temp_info = "(!)"
+            else:
+                status = dell_powerconnect_10g_temp_status2nagios_map[dell_powerconnect_status]
 
-        return (status, 'The temperature sensor is currently (%s)%s, and the current temperature is %sC%s' %
-                        (dell_powerconnect_10g_temp_status_map[state], sensor_info, temp, temp_info), [
-               ("temperature", int(temp), warn, crit, 0, 200),
-               ])
+            return (status, 'The temperature sensor is currently (%s)%s, and the current temperature is %sC%s' %
+                            (dell_powerconnect_10g_temp_status_map[state], sensor_info, temp, temp_info), [
+                   ("temperature", int(temp), warn, crit, 0, 200),
+                   ])
 
     return (3, "item not found in snmp data")
 
@@ -94,7 +107,7 @@ check_info["dell_powerconnect_10g_temp"] = {
     'inventory_function':      inventory_dell_powerconnect_10g_temp,
     'service_description':     'Temperature',
     'has_perfdata':            True,
-    'snmp_info':               ('.1.3.6.1.4.1.674.10895.5000.2.6132.1.1.43.1.8.1', ['5', '3', '1']),
+    'snmp_info':               ('.1.3.6.1.4.1.674.10895.5000.2.6132.1.1.43.1.8.1', ['5', '3', '1', '2']),
     'snmp_scan_function':      \
      lambda oid: ".1.3.6.1.4.1.674.10895" in oid(".1.3.6.1.2.1.1.2.0"),
     'group':                   'hw_temperature',
