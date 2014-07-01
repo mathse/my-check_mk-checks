@@ -24,16 +24,16 @@ def inventory_interface_switch_location(checkname, info):
    lineIndex = 0
    for interface, type, mac, state, name, opstatus in info:
       if type == "6" and state == "1" and mac.encode('hex') != "" and opstatus == "1":
-         if name.find("Miniport") == -1:
+         if name.find("WAN Miniport") == -1 and name.find("USB") == -1 and name.find("WAN-Miniport") == -1 :
             inventory.append( ("HW Switch-Port " + mac.encode('hex'), None) )
    return inventory
 
 def check_interface_switch_location(item, params, info):
+   from os.path import expanduser
    msg = ""
    for interface, type, mac, state, name, opstatus in info:
       if "HW Switch-Port " + mac.encode('hex') == item:
-         # this needs to be adjusted
-         socket_path = "/omd/sites/prod/tmp/run/live"
+         socket_path = expanduser("~") + "/tmp/run/live"
          import socket
          # firewall exception
          if (lookup_ipaddress(g_hostname)[:10] == "141.80.181") or (lookup_ipaddress(g_hostname)[:10] == "141.80.183"):

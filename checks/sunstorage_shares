@@ -32,7 +32,7 @@ def check_sunstorage_shares(item, params, info):
       if "Share " + sharename == item:
          size_mb = float(size) * 1024.0
          avail_mb = (float(size) - float(used)) * 1024.0
-         state, infotext, perfdata = df_check_filesystem_single(g_hostname, item, size_mb, avail_mb, params)
+         state, infotext, perfdata = df_check_filesystem_single(g_hostname, item, size_mb, avail_mb, 0,0, params)
          return (0, "OK - [" + subproject + "] " + sharename + " is at " + infotext ,perfdata)
    return (3, "Share seems to be deleted")
 
