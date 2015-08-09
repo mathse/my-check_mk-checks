@@ -29,7 +29,7 @@ if params['manufacturer'] == "HP":
 	except:
 		rows = []
  
-	warranties = u'\n'.join(unicode(u';'.join(unicode(cell.text.strip()) for cell in row.findAll("td"))) for row in rows).replace(";;;\n",";")
+	warranties = u'\n'.join(unicode(u';'.join(unicode(cell.text.strip()) for cell in row.findAll("td"))) for row in rows).replace(";;;\n",";").replace("\nWty:","\nBase Warranty;"+params['serialnumber']+";Wty:")
 
 if params['manufacturer'] == "Dell":
 	from suds.client import Client
