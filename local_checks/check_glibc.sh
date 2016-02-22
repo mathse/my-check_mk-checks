@@ -20,8 +20,8 @@ fi
 if [ "$operatingsystem" == "CentOS" ]
 then
 	operatingsystemmajrelease=$(facter operatingsystemrelease | cut -c 1)
-	libcversion=$(rpm -q glibc)
 	hardwaremodel=$(facter hardwaremodel)
+	libcversion=$(rpm -q glibc | grep $hardwaremodel)
 	if [ "$libcversion" == "glibc-2.12-1.166.el6_7.7.$hardwaremodel" ] && [ "$operatingsystemmajrelease" == "6" ]
 	then
 		exitCode=0
