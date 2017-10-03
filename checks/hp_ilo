@@ -42,19 +42,9 @@ def check_hp_ilo(item, params, info):
       msg = msg + "(!!) ilo ip is not pingable"
   
    if ip == "0.0.0.0":
-      crit = 0
+      crit = crit + 1
       msg = msg + " ignored - ilo not configured"
 
-   # exception for firewalled subnets
-   if (crit > 0) and ((lookup_ipaddress(g_hostname)[:10] == "141.80.181") or (lookup_ipaddress(g_hostname)[:10] == "141.80.183") or (ip[:7] == "192.168")):
-      crit = 0
-      dmz = True
-      msg = msg + " ignored - firewall blocks detailed checking"
-
-   if (crit == 0):
-      if(os.popen("/usr/local/nagios/libexec/check_tcp -H " + ip + " -p 80 -t 2").read().split(" - ")[0]=="CRITICAL") and dmz == False:
-         crit = crit + 1
-         msg = msg + "(!!) website cannot be opened"
    
    if crit > 0:
       return (2, ip + msg)
